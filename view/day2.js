@@ -20,12 +20,19 @@ class Weather extends Component{
   constructor(props) {
     super(props)
     this.state = {
+      weather: null,
       city: null,
-      dataList: []
     }
   }
 
   componentWillMount() {
+    // 清空缓存
+    AsyncStorage.clear(function(err){
+      if(!err){
+        alert('存储的数据已清除完毕!');
+      }
+    })
+
     var city = this.state.city;
     this.fetchWeatherData(city);
   }
@@ -34,43 +41,47 @@ class Weather extends Component{
     var url;
     if (!city) {
       url = "http://www.sojson.com/open/api/weather/json.shtml?city=苏州";
-    } else {
-      url = "http://www.sojson.com/open/api/weather/json.shtml?city=" + city;
-    }
-
-    fetch(url)
-    .then((response) => response.json())
-    .then((responseData) => {
-      if (this.judgeCity(city)) {
+      
+      fetch(url)
+      .then((response) => response.json())
+      .then((responseData) => {
         if (responseData.status == 200) {
           this.setState({
-            dataList: this.state.dataList.concat(
-              {
-                weather: responseData
-              }
-            ),
+            weather: responseData
           });
+
+          AsyncStorage.setItem("苏州", JSON.stringify(responseData));
         } else {
           alert("请输入正确的城市");
         }
-      } else {
-        alert("该城市已经添加");
-      }
-    })
-    .done();
-  }
-
-  judgeCity(city) {
-    var flg = true;
-    if (city) {
-      for (var i in this.state.dataList) {
-        if (this.state.dataList[i].weather.city == city) {
-          flg = false;
+      })
+      .done();
+    } else {
+      AsyncStorage.getItem(city, (error, result) => {
+        if (!result) {
+          url = "http://www.sojson.com/open/api/weather/json.shtml?city=" + city;
+          
+          fetch(url)
+          .then((response) => response.json())
+          .then((responseData) => {
+            if (responseData.status == 200) {
+              this.setState({
+                weather: responseData
+              });
+  
+              AsyncStorage.setItem(city, JSON.stringify(responseData));
+            } else {
+              alert("请输入正确的城市");
+            }
+          })
+          .done();
+        } else {
+          this.setState({
+            weather: JSON.parse(result)
+          })
         }
-      }
-      return flg;
+      })
     }
-    return flg;
   }
 
   _back() {
@@ -83,75 +94,74 @@ class Weather extends Component{
     })
   }
 
-  // Swiper
+  // 缓存
   render() {
-    var slides;
-    if (!this.state.dataList) {
-      slides = ( <Text>Loading...</Text> )
-    } else {
-      slides = this.state.dataList.map((elem, index) => {
-        const dayView = elem.weather.data.forecast.map((dayElem,index1)=> {
+      var slides;
+      if (!this.state.weather) {
+        slides = ( <Text>Loading...</Text> )
+      } else {
+        const dayView = this.state.weather.data.forecast.map((elem, index) => {
           return (
-          <View key={index1} style={styles.withinWeekLine}>
-            <View style={styles.withinWeekDay}>
-              <Text style={styles.withinWeekDayText}>{dayElem.date}</Text>
+            <View key={index} style={styles.withinWeekLine}>
+              <View style={styles.withinWeekDay}>
+                <Text style={styles.withinWeekDayText}>{elem.date}</Text>
+              </View>
+              <View style={styles.withinWeekDegree}>
+                <Text style={styles.withinWeekHigh}>{elem.high}</Text>
+                <Text style={styles.withinWeekLow}>{elem.low}</Text>
+              </View>
             </View>
-            <View style={styles.withinWeekDegree}>
-              <Text style={styles.withinWeekHigh}>{dayElem.high}</Text>
-              <Text style={styles.withinWeekLow}>{dayElem.low}</Text>
-            </View>
-          </View>
           );
         });
 
-        return(
-          <View key={index}>
+        slides = (
+          <View>
           <Image style={styles.image} source={require("./img/w3.png")}></Image>
           <ScrollView style={styles.pageContainer}  showsVerticalScrollIndicator={false}>
             <View style={styles.headInfo}>
-              <Text style={styles.city}>{elem.weather.city}</Text>
-              <Text style={styles.abs}>{elem.weather.data.quality}</Text>
-              <Text style={styles.degree}>{elem.weather.data.wendu}</Text>
+              <Text style={styles.city}>{this.state.weather.city}</Text>
+              <Text style={styles.abs}>{this.state.weather.data.quality}</Text>
+              <Text style={styles.degree}>{this.state.weather.data.wendu}</Text>
               <Text style={styles.circle}>°</Text>
             </View>
             <View style={styles.withinDay}>
               <View style={styles.withinDayGeneral}>
                 <View style={styles.withinDayHead}>
-                  <Text style={styles.withinDayWeek}>{elem.weather.data.yesterday.date}</Text>
+                  <Text style={styles.withinDayWeek}>{this.state.weather.data.yesterday.date}</Text>
                   <Text style={styles.withinDayDay}>昨天</Text>
                 </View>
                 <View style={styles.withinDayTail}>
-                  <Text style={styles.withinDayHigh}>{elem.weather.data.yesterday.high}</Text>
-                  <Text style={styles.withinDayLow}>{elem.weather.data.yesterday.low}</Text>
+                  <Text style={styles.withinDayHigh}>{this.state.weather.data.yesterday.high}</Text>
+                  <Text style={styles.withinDayLow}>{this.state.weather.data.yesterday.low}</Text>
               </View>
             </View>
             <View style={styles.withinWeek}>
               {dayView}
             </View>
             <View style={styles.weatherInfo}>
-              <Text style={styles.weatherInfoText}>{elem.weather.data.ganmao}</Text>
+              <Text style={styles.weatherInfoText}>{this.state.weather.data.ganmao}</Text>
             </View>
             <View style={styles.weatherOther}>
               <View style={styles.weatherOtherSection}>
                 <View style={styles.weatherOtherLine}>
                   <Text style={styles.weatherOtherTitle}>日出：</Text>
-                  <Text style={styles.weatherOtherValue}>{elem.weather.data.yesterday.sunrise}</Text>
+                  <Text style={styles.weatherOtherValue}>{this.state.weather.data.yesterday.sunrise}</Text>
                 </View>
                 <View style={styles.weatherOtherLine}>
                   <Text style={styles.weatherOtherTitle}>日落：</Text>
-                  <Text style={styles.weatherOtherValue}>{elem.weather.data.yesterday.sunset}</Text>
+                  <Text style={styles.weatherOtherValue}>{this.state.weather.data.yesterday.sunset}</Text>
                 </View>
               </View>
               <View style={styles.weatherOtherSection}>
                 <View style={styles.weatherOtherLine}>
                   <Text style={styles.weatherOtherTitle}>湿度：</Text>
-                  <Text style={styles.weatherOtherValue}>{elem.weather.data.shidu}</Text>
+                  <Text style={styles.weatherOtherValue}>{this.state.weather.data.shidu}</Text>
                 </View>
               </View>
               <View style={styles.weatherOtherSection}>
                 <View style={styles.weatherOtherLine}>
                   <Text style={styles.weatherOtherTitle}>风速：</Text>
-                  <Text style={styles.weatherOtherValue}>{elem.weather.data.yesterday.fl}</Text>
+                  <Text style={styles.weatherOtherValue}>{this.state.weather.data.yesterday.fl}</Text>
                 </View>
               </View>
             </View>
@@ -159,13 +169,12 @@ class Weather extends Component{
           </ScrollView>
         </View>
         )
-      });
-    }
+      }
 
     return(
       <View style={{width: Util.size.width, height: Util.size.height}}>
         <TextInput style={styles.textInputStyle} onChangeText={(text) => this.handleTextChange(text)} ></TextInput>
-        <TouchableHighlight style={styles.confirmStyle} onPress={() => this.fetchWeatherData(this.state.city)}><Text>添加新的城市</Text></TouchableHighlight>
+        <TouchableHighlight style={styles.confirmStyle} onPress={() => this.fetchWeatherData(this.state.city)}><Text>搜索城市</Text></TouchableHighlight>
         <Swiper 
           style={styles.wrapper} 
           showsButtons={false}
